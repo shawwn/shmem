@@ -1,0 +1,21 @@
+# - Config file for the shmem package
+# It defines the following variables
+#  SHMEM_INCLUDE_DIRS - include directories for shmem
+#  SHMEM_LIBRARIES    - libraries to link against
+#  SHMEM_EXECUTABLE   - the test_shmem executable
+
+# Compute paths
+get_filename_component(SHMEM_CMAKE_DIR "${CMAKE_CURRENT_LIST_FILE}" PATH)
+if(EXISTS "${SHMEM_CMAKE_DIR}/CMakeCache.txt")
+   # In build tree
+   include("${SHMEM_CMAKE_DIR}/shmemBuildTreeSettings.cmake")
+else()
+   set(SHMEM_INCLUDE_DIRS "${SHMEM_CMAKE_DIR}/@CONF_REL_INCLUDE_DIR@")
+endif()
+
+# Our library dependencies (contains definitions for IMPORTED targets)
+include("${SHMEM_CMAKE_DIR}/shmemLibraryDepends.cmake")
+
+# These are IMPORTED targets created by shmemLibraryDepends.cmake
+set(SHMEM_LIBRARIES shmem)
+set(SHMEM_EXECUTABLE test_shmem)
