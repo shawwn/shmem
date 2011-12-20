@@ -32,6 +32,7 @@ static const size_t		SHMEM_HEADER_SIZE( 64 );
 
 // forward declarations.
 struct shmem_header_t;
+static uint32_t			shmem_calc_total_size( size_t size );
 static shmem_header_t*	shmem_get_header( shmem_t* shm );
 static shmem*			shmem_connect( const char* name, size_t size );
 static bool				shmem_platform_startup( shmem_t* shm, uint32_t size );
@@ -53,6 +54,7 @@ typedef struct shmem
 #else
 	int			fd;
 #endif
+	size_t		size;
 	bool		created;
 } shmem_t;
 
@@ -105,6 +107,16 @@ const char*	shmem_get_name( shmem_t* shm )
 }
 
 //---------------------------------------------------------------------------
+size_t	shmem_get_size( shmem_t* shm )
+{
+	assert( shm );
+	if ( !shm )
+		return 0;
+
+	return shm->size;
+}
+
+//---------------------------------------------------------------------------
 bool	shmem_was_created( shmem_t* shm )
 {
 	assert( shm );
@@ -117,6 +129,12 @@ bool	shmem_was_created( shmem_t* shm )
 //===================================================================================
 // named shared memory - private methods.
 //===================================================================================
+
+//---------------------------------------------------------------------------
+uint32_t	shmem_calc_total_size( size_t size )
+{
+	return (uint32_t)( SHMEM_HEADER_SIZE + size );
+}
 
 //---------------------------------------------------------------------------
 shmem_header_t*	shmem_get_header( shmem_t* shm )
@@ -137,8 +155,13 @@ shmem_t*	shmem_connect( const char* name, size_t size )
 {
 	shmem_t* shm = (shmem_t*)calloc( 1, sizeof( shmem_t ) );
 	shm->name = strclone( name );
+	shm->size = size;
+#if !ON_WINDOWS
+	shm->fd = -1;
+	shm->mapped = MAP_FAILED;
+#endif
 
-	uint32_t total_size = (uint32_t)( SHMEM_HEADER_SIZE + size );
+	uint32_t total_size = shmem_calc_total_size( size );
 
 	if ( shmem_platform_startup( shm, total_size ) )
 	{
@@ -193,8 +216,6 @@ static bool			shmem_platform_startup( shmem_t* shm, uint32_t size )
 	//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 	// Windows
 	//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-	assert( shm->handle == NULL );
-	if ( shm->handle == NULL )
 	{
 		char* fullname = strjoin( "Global\\", shm->name );
 
@@ -214,11 +235,6 @@ static bool			shmem_platform_startup( shmem_t* shm, uint32_t size )
 		{
 			success = true;
 		}
-		else
-		{
-			success = false;
-			shmem_platform_shutdown( shm );
-		}
 
 		strfree( fullname );
 	}
@@ -227,8 +243,35 @@ static bool			shmem_platform_startup( shmem_t* shm, uint32_t size )
 	// Posix
 	//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 	{
+		char* fullname = strjoin( "/", shm->name );
+
+		shm->created = false;
+		shm->fd = shm_open( fullname, (O_CREAT | O_RDWR | O_EXCL), (S_IRUSR | S_IWUSR) );
+		if ( shm->fd == -1 )
+		{
+			shm->created = true;
+			shm->fd = shm_open( fullname, (O_CREAT | O_RDWR), (S_IRUSR | S_IWUSR) );
+		}
+
+		if ( shm->fd != -1 )
+		{
+			ftruncate( shm->fd, size );
+
+			shm->mapped = (uint8_t*)mmap( 0, size, (PROT_READ | PROT_WRITE), MAP_SHARED, shm->fd, 0 );
+			if ( shm->mapped != MAP_FAILED )
+			{
+				success = true;
+			}
+		}
+
+		strfree( fullname );
 	}
 #endif
+
+	if ( !success )
+	{
+		shmem_platform_shutdown( shm );
+	}
 
 	return success;
 }
@@ -262,6 +305,17 @@ void	shmem_platform_shutdown( shmem_t* shm )
 	// Posix
 	//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 	{
+		if ( shm->mapped != MAP_FAILED )
+		{
+			size_t len = shmem_calc_total_size( shmem_get_size( shm ) );
+			munmap( shm->mapped, len );
+			shm->mapped = NULL;
+		}
+		if ( shm->fd != -1 )
+		{
+			close( shm->fd );
+			shm->fd = -1;
+		}
 	}
 #endif
 }
