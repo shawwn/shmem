@@ -62,5 +62,5 @@ configure_file(shmemConfigVersion.cmake.in
 
 # Install the export set for use with the install-tree
 install(EXPORT shmemLibraryDepends DESTINATION
-  "${INSTALL_DATA_DIR}/shmem/CMake"
+  "${INSTALL_BIN_DIR}/shmem/CMake"
   COMPONENT dev)

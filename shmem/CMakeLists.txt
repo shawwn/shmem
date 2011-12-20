@@ -5,6 +5,10 @@ add_library(shmem STATIC shmem.cpp shmem.h config.h.in)
 set_target_properties(shmem PROPERTIES
   PUBLIC_HEADER "shmem.h;${CMAKE_CURRENT_BINARY_DIR}/config.h")
 
+if(CMAKE_SYSTEM_NAME MATCHES "Linux")
+    target_link_libraries(shmem rt)
+endif(CMAKE_SYSTEM_NAME MATCHES "Linux")
+
 install(TARGETS shmem
   # IMPORTANT: Add the shmem library to the "export-set"
   EXPORT shmemLibraryDepends

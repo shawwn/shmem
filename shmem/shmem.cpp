@@ -158,7 +158,7 @@ shmem_t*	shmem_connect( const char* name, size_t size )
 	shm->size = size;
 #if !ON_WINDOWS
 	shm->fd = -1;
-	shm->mapped = MAP_FAILED;
+	shm->mapped = (uint8_t*)MAP_FAILED;
 #endif
 
 	uint32_t total_size = shmem_calc_total_size( size );
@@ -208,7 +208,7 @@ shmem_t*	shmem_connect( const char* name, size_t size )
 //---------------------------------------------------------------------------
 static bool			shmem_platform_startup( shmem_t* shm, uint32_t size )
 {
-	assert( shm && (shm->mapped == NULL) );
+	assert( shm );
 
 	bool success = false;
 
@@ -245,11 +245,11 @@ static bool			shmem_platform_startup( shmem_t* shm, uint32_t size )
 	{
 		char* fullname = strjoin( "/", shm->name );
 
-		shm->created = false;
+		shm->created = true;
 		shm->fd = shm_open( fullname, (O_CREAT | O_RDWR | O_EXCL), (S_IRUSR | S_IWUSR) );
 		if ( shm->fd == -1 )
 		{
-			shm->created = true;
+			shm->created = false;
 			shm->fd = shm_open( fullname, (O_CREAT | O_RDWR), (S_IRUSR | S_IWUSR) );
 		}
 
@@ -315,6 +315,9 @@ void	shmem_platform_shutdown( shmem_t* shm )
 		{
 			close( shm->fd );
 			shm->fd = -1;
+            char* fullname = strjoin( "/", shm->name );
+            shm_unlink( fullname );
+            strfree( fullname );
 		}
 	}
 #endif
