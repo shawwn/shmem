@@ -1,31 +1,26 @@
+#ifndef SHMEM_H
+#define SHMEM_H
 
-#pragma once
-#ifndef SHMEM_SHMEM_H
-#define SHMEM_SHMEM_H
+// std C headers.
+#include <cstddef>
 
-#if shmem_DLL
-// .dll (or .so) interface.
-#if _MSC_VER
-# ifdef shmem_EXPORTS
-#  define SHMEM_API		__declspec( dllexport )
-# else
-#  define SHMEM_API		__declspec( dllimport )
-# endif
-#else // _WIN32
-# if defined __SUNPRO_C  || defined __SUNPRO_CC
-#  define SHMEM_API __global
-# elif (defined __GNUC__ && __GNUC__ >= 4) || defined __INTEL_COMPILER
-#  define SHMEM_API __attribute__ ((visibility("default")))
-# else
-#  define SHMEM_API
-# endif
-#endif
-#else
-#define SHMEM_API	extern
-#endif
-
+//===================================================================================
+// named shared memory.
+//===================================================================================
 #include <shmem/config.h>
 
-SHMEM_API void foo(void);
+struct shmem; typedef struct shmem shmem_t;
+
+shmem_t*	shmem_create( const char* name, size_t size );
+shmem_t*	shmem_open( const char* name, size_t size );
+shmem_t*	shmem_create_or_open( const char* name, size_t size );
+void		shmem_close( shmem_t* shm );
+
+void*		shmem_ptr( shmem_t* shm );
+
+const char*	shmem_get_name( shmem_t* shm );
+bool		shmem_was_created( shmem_t* shm );
+
+
 
 #endif
